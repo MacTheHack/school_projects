@@ -10,7 +10,7 @@ import p1.Message;
  * and receiving Message-object from the server.
  * 
  * Date: 28/2 2019
- * @author Mattias Jönsson
+ * @author Mattias JÃ¶nsson
  *
  */
 public class MessageClient {
@@ -88,7 +88,7 @@ public class MessageClient {
 	 * Create a thread to make a connection to the server
 	 * 
 	 * Date: 28/2 2019
-	 * @author Mattias Jönsson
+	 * @author Mattias JÃ¶nsson
 	 *
 	 */
 	private class Connection extends Thread {
@@ -116,6 +116,32 @@ public class MessageClient {
 			try {
 				disconnect();
 			} catch(Exception e) {}
+		}
+	}
+}
+
+class Start {
+	private MessageClient client;
+	private boolean connected = false;
+
+	public Start(MessageClient client) {
+		this.client = client;
+	}
+	public void connected(boolean connected) {
+		this.connected = connected;
+	}
+	
+	public void connect() {
+		new Connect();
+	}
+	
+	private class Connect {
+		public Connect() {
+			if(!connected) {
+				client.connect();
+			} else {
+				client.disconnect();
+			}
 		}
 	}
 }
