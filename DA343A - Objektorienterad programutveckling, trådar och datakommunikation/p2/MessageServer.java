@@ -12,10 +12,10 @@ import p1.*;
  * from a MessageManger through an Observer.
  * 
  * Date: 28/2 2019
- * @author Mattias Jönsson
+ * @author Mattias JÃ¶nsson
  *
  */
-public class MessageServer  implements Runnable{
+public class MessageServer implements Runnable{
 	private Thread server = new Thread(this);
 	private ServerSocket serverSocket;
 	private LinkedList<Message> msgList = new LinkedList<Message>();
@@ -31,23 +31,6 @@ public class MessageServer  implements Runnable{
 		serverSocket = new ServerSocket(port);
 		server.start();
 		messageManager.addObserver(new MsgObserver());
-	}
-
-	/**
-	 * Make a pause of 200 milliseconds
-	 * if the LinkedList of Message-objects
-	 * is empty.
-	 * 
-	 * @param msg A Message-object
-	 * @return the Message-object it receives
-	 */
-	private Message makePause(Message msg) {
-		try {
-			if(!msgList.isEmpty()) Thread.sleep(200);
-		} catch (InterruptedException e) {
-			System.out.println(e.toString());
-		} 
-		return msg;
 	}
 	
 	/* (non-Javadoc)
@@ -68,7 +51,7 @@ public class MessageServer  implements Runnable{
 	 * Creates a Observer
 	 * 
 	 * Date: 28/2 2019
-	 * @author Mattias Jönsson
+	 * @author Mattias JÃ¶nsson
 	 *
 	 */
 	private class MsgObserver implements Observer{
@@ -84,12 +67,11 @@ public class MessageServer  implements Runnable{
 	 * Create a thread to handle the client.
 	 * 
 	 * Date: 28/2 2019
-	 * @author Mattias Jönsson
+	 * @author Mattias JÃ¶nsson
 	 *
 	 */
 	private class ClientHandler extends Thread {
 		private Socket socket;
-		int j=1;
 		/**
 		 * Sets the private socket to the socket of the client
 		 * 
@@ -105,16 +87,15 @@ public class MessageServer  implements Runnable{
 		public void run() {
 			int i=0;
 			try (ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream())) {
-				while(true) {
+				while(!Thread.interrupted()) {
 					if(!msgList.isEmpty()) {
 						if(i<msgList.size()) {
-							oos.writeObject(makePause(msgList.get(i++)));
+							oos.writeObject(msgList.get(i++));
 							oos.flush();
 						}
 					}
-					else Thread.sleep(10);
 				}
-			} catch(IOException | InterruptedException e) {
+			} catch(IOException e) {
 				System.out.println(e.toString());
 			}
 			try {
@@ -122,7 +103,6 @@ public class MessageServer  implements Runnable{
 			} catch(IOException e) {
 				System.out.println(e.toString());
 			}
-			System.out.println("Klient nerkopplad");
 		}
 	}
 }
