@@ -68,7 +68,7 @@ public class MessageClient {
 	 * 
 	 * @param result The message
 	 */
-	private void sendMessage(final Message result) {
+	private void sendMessage(Message result) {
 		for (int i=0;i<list.size();i++) {
 			list.get(i).update(result);
 		}
@@ -95,8 +95,10 @@ public class MessageClient {
 		private ObjectInputStream ois;
 
 		/**
-		 * @param socket
-		 * @throws IOException
+		 * Constructs a Connection-object 
+		 * 
+		 * @param socket the socket used for the connection
+		 * @throws IOException 
 		 */
 		public Connection(Socket socket) throws IOException {
 			ois = new ObjectInputStream(socket.getInputStream());
@@ -107,7 +109,7 @@ public class MessageClient {
 		 */
 		public void run() {
 			try {
-				while(true) {
+				while(!Thread.interrupted()) {
 					sendMessage((Message)ois.readObject());
 				}
 			} catch(IOException | ClassNotFoundException e) {
