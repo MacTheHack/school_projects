@@ -1,117 +1,135 @@
-package gu;
+package test;
 
-import java.awt.EventQueue;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
 
-import javax.swing.JFrame;
-import java.awt.BorderLayout;
-import javax.swing.JTextArea;
-import java.awt.Color;
-import javax.swing.JPanel;
-import java.awt.GridLayout;
 
-import javax.swing.JTextField;
-import javax.swing.JTextPane;
-import javax.swing.SwingConstants;
+public class ServerUI extends JFrame implements ActionListener, WindowListener {
 
-import java.awt.GridBagConstraints;
-import javax.swing.JLabel;
-import java.awt.Insets;
-import java.util.LinkedList;
+	private static final long serialVersionUID = 1L;
+	private JButton stopStart;
+	private JTextArea chat, event;
+	private JTextField tPortNumber;
+	private Server server;
+	private JButton btnList;
 
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
+	public ServerUI(int port) {
+		super("Chat Server");
+		server = null;
+		JPanel north = new JPanel();
+		north.add(new JLabel("Port number: "));
+		tPortNumber = new JTextField("  " + port);
+		north.add(tPortNumber);
+		stopStart = new JButton("Start server");
+		btnList =  new JButton("Show list");
+		stopStart.addActionListener(this);
+		btnList.addActionListener(this);
+		north.add(stopStart);
+		north.add(btnList);
+		add(north, BorderLayout.NORTH);
 
-public class ServerUI {
-	private JFrame frame;
-	private JTextField textField;
-	private JTextField textField_1;
-	private JTextPane textPane;
-	private LinkedList<Message> list = new LinkedList<>();
+		JPanel center = new JPanel(new GridLayout(2,1));
+		chat = new JTextArea(80,80);
+		chat.setEditable(false);
+		appendRoom("Chat room.\n");
+		center.add(new JScrollPane(chat));
+		event = new JTextArea(80,80);
+		event.setEditable(false);
+		appendEvent("Events log.\n");
+		center.add(new JScrollPane(event));	
+		add(center);
 
-	/**
-	 * Launch the application.
-	 */
-	public static void main(String[] args) {
-		start();
+		// need to be informed when the user click the close button on the frame
+		addWindowListener(this);
+		setSize(400, 600);
+		setVisible(true);
+	}		
+
+	// append message to the two JTextArea
+	// position at the end
+	public void appendRoom(String str) {
+		chat.append(str);
+		chat.setCaretPosition(chat.getText().length() - 1);
 	}
-	
-	public static void start() {
-		EventQueue.invokeLater(new Runnable() {
-			public void run() {
-				try {
-					ServerUI window = new ServerUI();
-					window.frame.setVisible(true);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+	public void appendEvent(String str) {
+		event.append(str);
+		event.setCaretPosition(chat.getText().length() - 1);
+
+	}
+
+	// start or stop where clicked
+	public void actionPerformed(ActionEvent e) {
+		if(e.getSource()==stopStart) {
+			if(server != null) {
+				server.stop();
+				server = null;
+				tPortNumber.setEditable(true);
+				stopStart.setText("Start server");
+				return;
+			}	
+			int port;
+			try {
+				port = Integer.parseInt(tPortNumber.getText().trim());
 			}
-		});
-	}
-
-	/**
-	 * Create the application.
-	 */
-	public ServerUI() {
-		initialize();
-		frame.setVisible(true);
-	}
-
-	/**
-	 * Initialize the contents of the frame.
-	 */
-	private void initialize() {
-		frame = new JFrame("Server");
-		frame.setBounds(100, 100, 450, 300);
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.getContentPane().setLayout(new BorderLayout());
-		
-		textPane = new JTextPane();
-		textPane.setBackground(Color.WHITE);
-		textPane.setEditable(false);
-		frame.getContentPane().add(textPane, BorderLayout.CENTER);
-		
-		JPanel panel = new JPanel();
-		frame.getContentPane().add(panel, BorderLayout.NORTH);
-		GridLayout gbl_panel = new GridLayout(1,5);
-		
-		panel.setLayout(gbl_panel);
-		
-		JLabel lblFrom = new JLabel("From:", SwingConstants.RIGHT);
-		panel.add(lblFrom);
-		
-		textField = new JTextField(10);
-		panel.add(textField);
-		
-		JLabel lblTo = new JLabel("To:", SwingConstants.RIGHT);
-		
-		panel.add(lblTo);
-		
-		textField_1 = new JTextField(10);
-		panel.add(textField_1);
-		
-		JButton btnNewButton = new JButton("Search");
-		panel.add(btnNewButton);
-	}
-	
-	public void append(Object obj) {
-		if(obj instanceof Message) {
-			list.add((Message) obj);
-			for(Message m:list) {
-				
+			catch(Exception er) {
+				appendEvent("Invalid port number");
+				return;
 			}
-			textPane.setText(textPane.getText()+((Message)obj).getSender().getUsername()+": "+((Message)obj).getText()+((Message)obj).getTimeRecived()+"\n");
+			server = new Server(port, this);
+			new ServerRunning().start();
+			stopStart.setText("Stop server");
+			tPortNumber.setEditable(false);
 		}
-		else if(obj instanceof User) {
-			textPane.setText(textPane.getText()+((User)obj).getUsername()+" has joined the server!\n");
-		}
-		else {
-			textPane.setText(obj.toString());
+		if(e.getSource()==btnList) {
+			server.showList();
 		}
 	}
-	private class CallbackClass implements CallbackInterface {
-		public void update(Object result) {
-			append(result);
+
+	// entry point to start the Server
+	public static void main(String[] arg) {
+		new ServerUI(1500);
+	}
+
+	/*
+	 * If the user click the X button to close the application
+	 * I need to close the connection with the server to free the port
+	 */
+	public void windowClosing(WindowEvent e) {
+		// if my Server exist
+		if(server != null) {
+			try {
+				server.stop();			// ask the server to close the conection
+			}
+			catch(Exception eClose) {
+			}
+			server = null;
+		}
+		// dispose the frame
+		dispose();
+		System.exit(0);
+	}
+	// I can ignore the other WindowListener method
+	public void windowClosed(WindowEvent e) {}
+	public void windowOpened(WindowEvent e) {}
+	public void windowIconified(WindowEvent e) {}
+	public void windowDeiconified(WindowEvent e) {}
+	public void windowActivated(WindowEvent e) {}
+	public void windowDeactivated(WindowEvent e) {}
+
+	/*
+	 * A thread to run the Server
+	 */
+	class ServerRunning extends Thread {
+		public void run() {
+			server.start();         // should execute until if fails
+			// the server failed
+			stopStart.setText("Start");
+			tPortNumber.setEditable(true);
+			appendEvent("Server crashed\n");
+			server = null;
 		}
 	}
 
 }
+

@@ -1,4 +1,4 @@
-package gu;
+package test;
 
 import java.io.Serializable;
 import javax.swing.ImageIcon;

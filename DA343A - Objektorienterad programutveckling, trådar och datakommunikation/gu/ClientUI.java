@@ -1,4 +1,4 @@
-package gu;
+package test;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
