@@ -1,4 +1,4 @@
-package test;
+package gu;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -33,6 +33,9 @@ public class Message implements Serializable {
 		this.text=text;
 		this.image=image;
 	}
+	public Message(int type) {
+		this.type=type;
+	}
 	public String getText() {
 		return text;
 	}
@@ -54,7 +57,6 @@ public class Message implements Serializable {
 	public int getType() {
 		return type;
 	}
-
 	public void setTimeRecived(String time) {
 		timeRecived=time;
 	}
@@ -65,7 +67,7 @@ public class Message implements Serializable {
 		if(image==null) return false;
 		return true;		
 	}
-	public void setReciver(User user) {
+	public void addReciver(User user) {
 		reciverList.add(user);
 	}
 }

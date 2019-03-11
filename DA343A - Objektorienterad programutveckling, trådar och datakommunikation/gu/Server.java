@@ -1,17 +1,24 @@
-package test;
+package gu;
 
+import java.awt.Dimension;
 import java.io.*;
 import java.net.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+
 public class Server {
 	private static int uniqueId;
 	private ArrayList<ClientThread> al;
+	private ArrayList<Message> messages;
+	private ArrayList<User> user;
 	private ServerUI serverUI;
 	private SimpleDateFormat sdf;
 	private int port;
-	private boolean keepGoing;
+	private boolean running;
+
 	public Server(int port) {
 		this(port, null);
 	}
@@ -21,16 +28,18 @@ public class Server {
 		this.port = port;
 		sdf = new SimpleDateFormat("yyyy.MM.dd 'at' HH:mm:ss");
 		al = new ArrayList<ClientThread>();
+		messages = new ArrayList<Message>();
 	}
 
 	public void start() {
-		keepGoing = true;
+		running = true;
 		try {
 			ServerSocket serverSocket = new ServerSocket(port);
-			while(keepGoing) {
+			deleteMessageFile();
+			while(running) {
 				display("Server waiting for Clients on port " + port + ".");
 				Socket socket = serverSocket.accept(); 
-				if(!keepGoing)
+				if(!running)
 					break;
 				ClientThread t = new ClientThread(socket);  
 				al.add(t);						
@@ -59,8 +68,13 @@ public class Server {
 		}
 	}		
 
+	private void deleteMessageFile() {
+		File file = new File("files/messages.dat");
+		file.delete();
+	}
+
 	protected void stop() {
-		keepGoing = false;
+		running = false;
 		try {
 			new Socket("localhost", port);
 		}
@@ -68,12 +82,9 @@ public class Server {
 		}
 	}
 
-	private void display(String msg) {
-		String time = sdf.format(new Date()) + " " + msg;
-		if(serverUI == null)
-			System.out.println(time);
-		else
-			serverUI.appendEvent(time + "\n");
+	private void display(Object obj) {
+		String time = sdf.format(new Date()) + " " + obj;
+		serverUI.appendEvent(time + "\n");
 	}
 
 	private synchronized void broadcast(Message message) {
@@ -82,21 +93,20 @@ public class Server {
 		message.setTimeSent(time);
 		if(!message.imageExists()) {
 			messageLf = message.getTimeSent()+" "+
-						message.getSender().getUsername()+" "+
-						message.getSender().getProfilepic().toString()+": "+
-						message.getText() + "\n";
+					message.getSender().getUsername()+" "+
+					message.getSender().getProfilepic().toString()+": "+
+					message.getText() + "\n";
 		}
 		else {
 			messageLf = message.getTimeSent()+" "+ 
-						message.getSender().getUsername()+" "+ 
-						message.getSender().getProfilepic().toString()+": "+
-						message.getText() +
-						message.getIcon().toString()+"\n";
+					message.getSender().getUsername()+" "+ 
+					message.getSender().getProfilepic().toString()+": "+
+					message.getText() +
+					message.getIcon().toString()+"\n";
 		}
-		if(serverUI == null) System.out.print(messageLf);
-		else serverUI.appendRoom(messageLf);    
+		serverUI.appendRoom(messageLf);    
 	}
-	synchronized void remove(int id) {
+	public synchronized void remove(int id) {
 		for(int i = 0; i < al.size(); ++i) {
 			ClientThread ct = al.get(i);
 			if(ct.id == id) {
@@ -108,53 +118,53 @@ public class Server {
 
 	public static void main(String[] args) {
 		int portNumber = 1500;
-		switch(args.length) {
-		case 1:
-			try {
-				portNumber = Integer.parseInt(args[0]);
-			}
-			catch(Exception e) {
-				System.out.println("Invalid port number.");
-				System.out.println("Usage is: > java Server [portNumber]");
-				return;
-			}
-		case 0:
-			break;
-		default:
-			System.out.println("Usage is: > java Server [portNumber]");
-			return;
-
-		}
 		Server server = new Server(portNumber);
 		server.start();
 	}
 
-	public void showList() {
-		display("List of the users connected at " + sdf.format(new Date()) + "\n");
-		for(int i = 0; i < al.size(); ++i) {
-			ClientThread ct = al.get(i);
-			display((i+1) + ") " + ct.user.getUsername() + " since " + ct.date);
+	private void writeToFile(Message message, String filename) throws IOException {
+		messages.add(message);
+		try(ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(filename)))) {
+			oos.writeInt(messages.size());
+			for(Message m:messages) {
+				oos.writeObject(m);
+				oos.flush();
+			}
 		}
 	}
-	
+
+	public void showMessages() throws FileNotFoundException, IOException {
+		String dateFrom = JOptionPane.showInputDialog("Date from:");
+		String dateTo = JOptionPane.showInputDialog("Date to:");
+		Message message = null;
+		try(ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(new FileInputStream("files/messages.dat")))) {
+			int n = ois.readInt();
+			for (int i = 0; i < n; i++) {
+				message=(Message) ois.readObject();
+				System.out.println(message.getTimeSent()+": "+message.getText());
+			}
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+
 	private class ClientThread extends Thread {
 		Socket socket;
 		ObjectInputStream sInput;
 		ObjectOutputStream sOutput;
 		int id;
-		String username;
+		String username, date;
 		Message message;
-		String date;
 		User user;
 		ClientThread(Socket socket) {
 			id = ++uniqueId;
 			this.socket = socket;
-			System.out.println("Thread trying to create Object Input/Output Streams");
 			try {
 				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
 				user = (User) sInput.readObject();
 				display(user.getUsername() + " just connected.");
+				serverUI.appendUsers(user.getUsername()+"\n");
 			}
 			catch (IOException e) {
 				display("Exception creating new Input/output Streams: " + e);
@@ -164,18 +174,13 @@ public class Server {
 			}
 			date = new Date().toString() + "\n";
 		}
-
-		// what will run forever
 		public void run() {
-			boolean keepGoing = true;
-			while(keepGoing) {
+			boolean running = true;
+			while(running) {
 				try {
 					String time = sdf.format(new Date());
 					message = (Message) sInput.readObject();
 					message.setTimeRecived(time);
-					for(int i = 0; i < al.size(); ++i) {
-						message.setReciver(al.get(i).user);
-					}
 				}
 				catch (IOException e) {
 					display(username + " Exception reading Streams: " + e);
@@ -184,35 +189,29 @@ public class Server {
 				catch(ClassNotFoundException e2) {
 					break;
 				}
-				// the messaage part of the ChatMessage
-
-				// Switch on the type of message receive
 				switch(message.getType()) {
 				case Message.MESSAGE:
 					broadcast(message);
+					try {
+						writeToFile(message, "files/messages.dat");
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 					break;
 				case Message.LOGOUT:
 					display(username + " has disconnected from the server.");
-					keepGoing = false;
-					break;
-				case Message.LIST:
-					writeMsg("List of the users connected at " + sdf.format(new Date()) + "\n");
-					for(int i = 0; i < al.size(); ++i) {
-						ClientThread ct = al.get(i);
-						writeMsg((i+1) + ") " + ct.username + " since " + ct.date);
-					}
+					running = false;
 					break;
 				}
 			}
 			remove(id);
 			close();
 		}
-
 		private void close() {
 			try {
-				if(sOutput != null) sOutput.close();
-				if(sInput != null) sInput.close();
-				if(socket != null) socket.close();
+				sOutput.close();
+				sInput.close();
+				socket.close();
 			}
 			catch(Exception e) {}
 		}

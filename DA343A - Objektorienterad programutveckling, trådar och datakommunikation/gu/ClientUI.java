@@ -1,4 +1,4 @@
-package test;
+package gu;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -37,14 +37,15 @@ public class ClientUI extends JPanel implements ActionListener{
 	private JTextPane textPaneMessage = new JTextPane();
 
 	private JLabel lblName = new JLabel("Username: ", SwingConstants.RIGHT);
+	private final JButton btnNewButton = new JButton("Show message between dates");
 
 	public ClientUI() {
 		actionListener();
 		setLayout();
 		setPreferredSize();
-		panelWhole.add(panelNorth);
-		panelWhole.add(panelCenter);
-		panelWhole.add(panelSouth);
+//		panelWhole.add(panelNorth);
+//		panelWhole.add(panelCenter);
+//		panelWhole.add(panelSouth);
 		add(panelNorth, BorderLayout.NORTH);
 		add(panelCenter, BorderLayout.CENTER);
 		add(panelSouth, BorderLayout.SOUTH);
@@ -54,6 +55,8 @@ public class ClientUI extends JPanel implements ActionListener{
 		panelNorthCenter.add(tf1);
 		panelNorthSouth.add(btnConnect);
 		panelNorthSouth.add(btnDisconnect);
+		
+		panelNorthSouth.add(btnNewButton);
 		panelNorthSouth.add(btnShowList);
 		panelNorth.add(panelNorthCenter, BorderLayout.CENTER);
 		panelNorth.add(panelNorthSouth, BorderLayout.SOUTH);
@@ -75,7 +78,7 @@ public class ClientUI extends JPanel implements ActionListener{
 	public void setLayout() {
 		setLayout(new BorderLayout());
 		panelNorthCenter.setLayout(new GridLayout(1,4));
-		panelNorthSouth.setLayout(new GridLayout(3,1));
+		panelNorthSouth.setLayout(new GridLayout(0,2));
 		panelNorth.setLayout(new BorderLayout());
 		panelCenter.setLayout(new BorderLayout());
 		panelSouth.setLayout(new BorderLayout());
@@ -125,12 +128,11 @@ public class ClientUI extends JPanel implements ActionListener{
 		return img;
 	}
 	public void actionPerformed(ActionEvent e) {
-
-		if(btnChoose == e.getSource()) {
+		if(e.getSource()==btnChoose) {
 			profileImage=imageChooser();
 			image.insertIcon(profileImage);
 		}
-		if(btnConnect == e.getSource()) {
+		if(e.getSource()==btnConnect) {
 			String username = tf1.getText().trim();
 			user = new User(username,profileImage);
 			client = new Client(ipAdress, port, user, this);
@@ -138,13 +140,20 @@ public class ClientUI extends JPanel implements ActionListener{
 			tf1.setEnabled(false);
 			connected = true;
 		}
-		if(btnSend == e.getSource()) {
+		if(e.getSource()==btnSend) {
 			if(connected) {
 				client.sendMessage(new Message(Message.MESSAGE, textPaneMessage.getText(),null,user,null));
 			}
 		}
-		if(btnImage == e.getSource()) {
+		if(e.getSource()==btnImage) {
 
+		}
+		if(e.getSource()==btnDisconnect) {
+//			client.sendMessage(new Message(Message.MESSAGE));
+			client.logout();
+		}
+		if(e.getSource()==btnShowList) {
+			client.showUserList();
 		}
 	}
 
@@ -155,7 +164,7 @@ public class ClientUI extends JPanel implements ActionListener{
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setVisible(true);
 		frame.pack();
-		frame.add(chatUI);
+		frame.getContentPane().add(chatUI);
 	}
 }
 
