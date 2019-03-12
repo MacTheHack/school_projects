@@ -10,6 +10,7 @@ public class Server {
 	private ArrayList<ClientThread> al;
 	private ArrayList<Message> messages;
 	private ArrayList<User> users;
+	private ArrayList<User> userList = new ArrayList<>();
 	private ServerUI serverUI;
 	private SimpleDateFormat sdf;
 	private int port;
@@ -158,11 +159,19 @@ public class Server {
 			this.socket = socket;
 			try {
 				sInput  = new ObjectInputStream(socket.getInputStream());
+				
 				user = (User) sInput.readObject();
+				
 				System.out.println(socket.getPort()+" "+user.getUsername());
+				
+				userList.add(user);
+				
 				clients.put(user.getUsername(), socket);
+				
 				display(user.getUsername()+" just connected.");
+				
 				writeUserToFile(user,"files/users.dat");
+				
 				serverUI.appendUsers(user.getUsername());
 			}
 			catch (IOException e) {
@@ -220,7 +229,8 @@ public class Server {
 					if(socket.isConnected()) {
 						System.out.println("User is connected");
 						sOutput = new ObjectOutputStream(socket.getOutputStream());
-						sOutput.writeObject(message);
+						sOutput.writeObject(userList);
+//						sOutput.writeObject(message);
 					}
 					else {
 						System.out.println("User is not connected");

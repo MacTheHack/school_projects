@@ -16,7 +16,7 @@ public class ClientUI extends JPanel implements ActionListener{
 	private User user;
 	private ImageIcon profileImage, img;
 	private ArrayList<User> reciverList = new ArrayList<User>();
-	private Contacts contacts = new Contacts();
+	private static Contacts contacts = new Contacts();
 
 	private JPanel panelNorth = new JPanel();
 	private JPanel panelNorthCenter = new JPanel();
@@ -114,6 +114,8 @@ public class ClientUI extends JPanel implements ActionListener{
 			messageListModel.addElement(m.getIcon());
 			messageListModel.addElement(m.getText()+" sent from "+m.getSender().getUsername()+". Sent "+m.getTimeSent());
 		}	
+		else messageListModel.addElement(obj);
+			
 	}
 	private void connected(boolean connected) {
 		this.connected = connected;
@@ -188,6 +190,9 @@ public class ClientUI extends JPanel implements ActionListener{
 			System.out.println("No File Select");
 		}
 		return img;
+	}
+	public static Contacts getContacts() {
+		return contacts;
 	}
 	public void actionPerformed(ActionEvent e) {
 		if(e.getSource()==btnChoose) {

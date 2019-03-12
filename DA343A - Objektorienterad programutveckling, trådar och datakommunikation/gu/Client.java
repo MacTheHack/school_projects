@@ -89,7 +89,6 @@ public class Client  {
 	}
 
 	private class ListenFromServer extends Thread {
-		Contacts contacts = new Contacts();
 		ArrayList<User> list = new ArrayList<User>();
 		public void run() {
 			try {
@@ -99,8 +98,15 @@ public class Client  {
 			}
 			while(true) {
 				try {
-					Message message = (Message)ois.readObject();
-					clientUI.append(message);
+					Object obj = ois.readObject();
+					if(obj instanceof ArrayList) {
+						ClientUI.getContacts().displayUsers((ArrayList<User>) obj);
+					}
+					else if(obj instanceof Message) {
+						Message message = (Message)obj;
+						clientUI.append((Message)obj);
+					}
+					
 				}
 				catch(IOException e) {
 					clientUI.append("Server has close the connection: " + e);
