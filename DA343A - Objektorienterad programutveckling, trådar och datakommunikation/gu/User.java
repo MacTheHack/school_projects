@@ -10,6 +10,7 @@ public class User implements Serializable{
 	private static final long serialVersionUID = 1L;
 	private String username;
 	private ImageIcon profilepic;
+	private int status;
 
 	public User(String username, ImageIcon profilepic) {
 		this.username=username;
@@ -23,6 +24,13 @@ public class User implements Serializable{
 	public ImageIcon getProfilepic() {
 		return profilepic;
 	}
+	public void setStatus(int status) {
+		this.status=status;
+	}
+	public int getStatus() {
+		return status;
+	}
+	
 	
 	public int hashCode() {
 		return username.hashCode();

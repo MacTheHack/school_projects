@@ -1,20 +1,22 @@
 package gu;
 
 import javax.swing.*;
-import javax.swing.filechooser.FileNameExtensionFilter;
-
+import javax.swing.filechooser.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.io.File;
+import java.awt.event.*;
+import java.io.*;
+import java.util.ArrayList;
 
 public class ClientUI extends JPanel implements ActionListener{
+	private static final long serialVersionUID = 1L;
 	private final int port = 1500;
 	private final String ipAdress = "127.0.0.1";
 	private Client client;
-	private boolean connected;
+	private boolean connected, imageChoosed=false;
 	private User user;
-	private ImageIcon profileImage;
+	private ImageIcon profileImage, img;
+	private ArrayList<User> reciverList = new ArrayList<User>();
+	private Contacts contacts = new Contacts();
 
 	private JPanel panelNorth = new JPanel();
 	private JPanel panelNorthCenter = new JPanel();
@@ -29,51 +31,61 @@ public class ClientUI extends JPanel implements ActionListener{
 	private JButton btnImage = new JButton("+");
 	private JButton btnDisconnect = new JButton("Disconnect");
 	private JButton btnShowList = new JButton("Show list");
-
+	private JButton btnMessages = new JButton("Show message between dates");
+	private JButton btnContacts = new JButton("Contact list");
+	
 	private JTextPane image = new JTextPane();
 
-	private JTextField tf1 = new JTextField();
-	private JTextPane textPaneViewer = new JTextPane();
+	private JTextField tfUsername = new JTextField();
+	private JList<Object> textPaneViewer;
 	private JTextPane textPaneMessage = new JTextPane();
+	
+	private DefaultListModel<Object> messageListModel;
 
 	private JLabel lblName = new JLabel("Username: ", SwingConstants.RIGHT);
-	private final JButton btnNewButton = new JButton("Show message between dates");
+	
 
 	public ClientUI() {
+		connected(false);
 		actionListener();
 		setLayout();
 		setPreferredSize();
-//		panelWhole.add(panelNorth);
-//		panelWhole.add(panelCenter);
-//		panelWhole.add(panelSouth);
 		add(panelNorth, BorderLayout.NORTH);
 		add(panelCenter, BorderLayout.CENTER);
 		add(panelSouth, BorderLayout.SOUTH);
 		panelNorthCenter.add(btnChoose);
 		panelNorthCenter.add(image);
 		panelNorthCenter.add(lblName);
-		panelNorthCenter.add(tf1);
+		panelNorthCenter.add(tfUsername);
 		panelNorthSouth.add(btnConnect);
 		panelNorthSouth.add(btnDisconnect);
-		
-		panelNorthSouth.add(btnNewButton);
+
+		panelNorthSouth.add(btnMessages);
 		panelNorthSouth.add(btnShowList);
 		panelNorth.add(panelNorthCenter, BorderLayout.CENTER);
 		panelNorth.add(panelNorthSouth, BorderLayout.SOUTH);
 
-		textPaneViewer.setEditable(false);
+		messageListModel = new DefaultListModel<Object>();
+		textPaneViewer = new JList<Object>(messageListModel);
+		textPaneViewer.setSelectionModel(new DisabledItemSelectionModel());
 		textPaneViewer.setBackground(new Color(220,220,220));
-		panelCenter.add(textPaneViewer);
+		panelCenter.add(new JScrollPane(textPaneViewer));
 
 		panelSouth.add(btnSend, BorderLayout.EAST);
 		panelSouth.add(textPaneMessage, BorderLayout.CENTER);
 		panelSouth.add(btnImage,BorderLayout.WEST);
+		panelSouth.add(btnContacts, BorderLayout.SOUTH);
+		
+		image.setEnabled(false);
 	}
 	public void actionListener() {
 		btnChoose.addActionListener(this);
 		btnConnect.addActionListener(this);
 		btnSend.addActionListener(this);
 		btnImage.addActionListener(this);
+		btnDisconnect.addActionListener(this);
+		btnShowList.addActionListener(this);
+		btnContacts.addActionListener(this);
 	}
 	public void setLayout() {
 		setLayout(new BorderLayout());
@@ -92,22 +104,72 @@ public class ClientUI extends JPanel implements ActionListener{
 		btnSend.setOpaque(true);
 		btnImage.setPreferredSize(new Dimension(80,30));
 		btnImage.setOpaque(true);
-		tf1.setPreferredSize(new Dimension(150, 40));
+		btnContacts.setPreferredSize(new Dimension(80,30));
+		btnContacts.setOpaque(true);
+		tfUsername.setPreferredSize(new Dimension(150, 40));
 	}
 	public void append(Object obj) {
-		if(!textPaneViewer.getText().isEmpty()) {
-			textPaneViewer.setText(textPaneViewer.getText()+"\n"+obj.toString());
-		}
-		else 
-			textPaneViewer.setText(obj.toString());
+		if(obj instanceof Message) {
+			Message m = (Message)obj;
+			messageListModel.addElement(m.getIcon());
+			messageListModel.addElement(m.getText()+" sent from "+m.getSender().getUsername()+". Sent "+m.getTimeSent());
+		}	
 	}
-	public void connectionFailed() {
-		System.out.println("connection failed");
+	private void connected(boolean connected) {
+		this.connected = connected;
+		btnDisconnect.setEnabled(connected);
+		btnConnect.setEnabled(!connected);
+		btnSend.setEnabled(connected);
+		btnShowList.setEnabled(connected);
+		btnImage.setEnabled(connected);
+		btnChoose.setEnabled(!connected);
+		btnMessages.setEnabled(connected);
+		textPaneMessage.setEnabled(connected);
+		tfUsername.setEnabled(!connected);
+	}
+	private User getUser(String username) throws IOException {
+		User u = null;
+		try(ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(new FileInputStream("files/users.dat")))) {
+			int n = ois.readInt();
+			for(int i=0;i<n;i++){
+				u=(User)ois.readObject();
+				if(u.getUsername().equals(username)) {
+					System.out.println(u.getStatus());
+					return u;
+				}		
+			}
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	private boolean userExists(String username) throws FileNotFoundException, IOException {
+		User[] users = getUserList();
+		for(User u:users) {
+			if(u.getUsername().equals(username)&&u.getStatus()==1) {
+				System.out.println(u.getStatus());
+				return true;
+			}
+		}
+		return false;
+	}
+	private User[] getUserList() throws IOException {
+		User[] u = null;
+		try(ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(new FileInputStream("files/users.dat")))) {
+			int n = ois.readInt();
+			u = new User[n];
+			for(int i=0;i<n;i++){
+				u[i]=(User)ois.readObject();
+			}
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		return u;
 	}
 	public ImageIcon resizeImage(String ImagePath, JTextPane tp){
 		ImageIcon MyImage = new ImageIcon(ImagePath);
 		Image img = MyImage.getImage();
-		Image newImg = img.getScaledInstance(tp.getWidth(), tp.getHeight(), Image.SCALE_SMOOTH);
+		Image newImg = img.getScaledInstance(tp.getHeight(), tp.getHeight(), Image.SCALE_SMOOTH);
 		ImageIcon image = new ImageIcon(newImg);
 		return image;
 	}
@@ -133,30 +195,74 @@ public class ClientUI extends JPanel implements ActionListener{
 			image.insertIcon(profileImage);
 		}
 		if(e.getSource()==btnConnect) {
-			String username = tf1.getText().trim();
-			user = new User(username,profileImage);
-			client = new Client(ipAdress, port, user, this);
-			if(!client.start()) return;
-			tf1.setEnabled(false);
-			connected = true;
+			String username = tfUsername.getText().trim();
+			if(!username.isEmpty()&&profileImage!=null) {
+				boolean userExists = false;
+				if(new File("files/users.dat").exists()) {
+					try { 
+						userExists(username);
+						System.out.println("test");
+					} catch (IOException e1) {
+						e1.printStackTrace();
+					}
+				}
+				if(!userExists) {
+					user = new User(username,profileImage);
+				}
+				else {
+					try {
+						user = getUser(username);
+					} catch (IOException e1) {
+						e1.printStackTrace();
+					}
+				}
+				client = new Client(ipAdress, port, user, this);
+				if(!client.start()) return;
+				connected(true);
+			}
 		}
 		if(e.getSource()==btnSend) {
-			if(connected) {
-				client.sendMessage(new Message(Message.MESSAGE, textPaneMessage.getText(),null,user,null));
+			if(!textPaneMessage.getText().isEmpty()) {
+				try {
+					for(User user:getUserList()) {reciverList.add(user);}
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+				if(imageChoosed) client.sendMessage(new Message(Message.MESSAGE, textPaneMessage.getText(),img,user,reciverList));
+				else client.sendMessage(new Message(Message.MESSAGE, textPaneMessage.getText(),null,user,reciverList));
+				textPaneMessage.setText("");
+				textPaneMessage.repaint();
+				img=null;
 			}
 		}
 		if(e.getSource()==btnImage) {
-
+			img=imageChooser();
+			imageChoosed=true;
+			textPaneMessage.insertIcon(img);
 		}
 		if(e.getSource()==btnDisconnect) {
-//			client.sendMessage(new Message(Message.MESSAGE));
 			client.logout();
+			connected(false);
 		}
 		if(e.getSource()==btnShowList) {
-			client.showUserList();
+			try {
+				User[] users = client.getUserList();
+				for(User u:users) {
+					System.out.println(u.getUsername());
+				}
+			} catch(IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+		if(e.getSource() == btnContacts) {
+			contacts.createFrame();
 		}
 	}
-
+	private class DisabledItemSelectionModel extends DefaultListSelectionModel {
+		public void setSelectionInterval(int index0, int index1) {
+			super.setSelectionInterval(-1,-1);
+		}
+	}
 	public static void main(String[] args) {
 		ClientUI chatUI = new ClientUI();
 		JFrame frame = new JFrame("Chat");
@@ -167,4 +273,3 @@ public class ClientUI extends JPanel implements ActionListener{
 		frame.getContentPane().add(chatUI);
 	}
 }
-

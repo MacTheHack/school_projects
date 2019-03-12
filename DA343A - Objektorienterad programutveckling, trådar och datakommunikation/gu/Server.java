@@ -1,24 +1,21 @@
 package gu;
 
-import java.awt.Dimension;
 import java.io.*;
 import java.net.*;
-import java.text.SimpleDateFormat;
+import java.text.*;
 import java.util.*;
-
-import javax.swing.JFrame;
-import javax.swing.JOptionPane;
+import javax.swing.*;
 
 public class Server {
-	private static int uniqueId;
 	private ArrayList<ClientThread> al;
 	private ArrayList<Message> messages;
-	private ArrayList<User> user;
+	private ArrayList<User> users;
 	private ServerUI serverUI;
 	private SimpleDateFormat sdf;
 	private int port;
 	private boolean running;
-
+	private HashMap<String, Socket> clients;
+	
 	public Server(int port) {
 		this(port, null);
 	}
@@ -29,19 +26,22 @@ public class Server {
 		sdf = new SimpleDateFormat("yyyy.MM.dd 'at' HH:mm:ss");
 		al = new ArrayList<ClientThread>();
 		messages = new ArrayList<Message>();
+		users = new ArrayList<User>();
+		clients = new HashMap<>();
 	}
 
 	public void start() {
 		running = true;
 		try {
 			ServerSocket serverSocket = new ServerSocket(port);
-			deleteMessageFile();
+			deleteFile("files/message.dat");
+			deleteFile("files/users.dat");
+			display("Server started. Port: " + port + ".");
 			while(running) {
-				display("Server waiting for Clients on port " + port + ".");
 				Socket socket = serverSocket.accept(); 
-				if(!running)
+				if(!running) 
 					break;
-				ClientThread t = new ClientThread(socket);  
+				ClientThread t = new ClientThread(socket); 
 				al.add(t);						
 				t.start();
 			}
@@ -63,17 +63,17 @@ public class Server {
 			}
 		}
 		catch (IOException e) {
-			String msg = sdf.format(new Date()) + " Exception on new ServerSocket: " + e + "\n";
-			display(msg);
+			String message = sdf.format(new Date()) + " Exception on new ServerSocket: " + e + "\n";
+			display(message);
 		}
 	}		
 
-	private void deleteMessageFile() {
-		File file = new File("files/messages.dat");
+	private void deleteFile(String filename) {
+		File file = new File(filename);
 		file.delete();
 	}
 
-	protected void stop() {
+	public void stop() {
 		running = false;
 		try {
 			new Socket("localhost", port);
@@ -89,45 +89,38 @@ public class Server {
 
 	private synchronized void broadcast(Message message) {
 		String time = sdf.format(new Date());
-		String messageLf;
 		message.setTimeSent(time);
-		if(!message.imageExists()) {
-			messageLf = message.getTimeSent()+" "+
-					message.getSender().getUsername()+" "+
-					message.getSender().getProfilepic().toString()+": "+
-					message.getText() + "\n";
-		}
-		else {
-			messageLf = message.getTimeSent()+" "+ 
-					message.getSender().getUsername()+" "+ 
-					message.getSender().getProfilepic().toString()+": "+
-					message.getText() +
-					message.getIcon().toString()+"\n";
-		}
-		serverUI.appendRoom(messageLf);    
-	}
-	public synchronized void remove(int id) {
-		for(int i = 0; i < al.size(); ++i) {
+		serverUI.appendRoom(message);  
+		for(int i = al.size(); --i >= 0;) {
 			ClientThread ct = al.get(i);
-			if(ct.id == id) {
-				al.remove(i);
-				return;
-			}
+			if(!ct.isAlive())
+				System.out.println(ct.user.getUsername());
+			ct.sendMessage(message);
 		}
+
 	}
 
 	public static void main(String[] args) {
-		int portNumber = 1500;
-		Server server = new Server(portNumber);
-		server.start();
+		new ServerUI(1500);
 	}
 
-	private void writeToFile(Message message, String filename) throws IOException {
+	private void writeMessageToFile(Message message, String filename) throws IOException {
 		messages.add(message);
 		try(ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(filename)))) {
 			oos.writeInt(messages.size());
 			for(Message m:messages) {
 				oos.writeObject(m);
+				oos.flush();
+			}
+		}
+	}
+	
+	private void writeUserToFile(User user, String filename) throws IOException {
+		users.add(user);
+		try(ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(filename)))) {
+			oos.writeInt(users.size());
+			for(User u:users) {
+				oos.writeObject(u);
 				oos.flush();
 			}
 		}
@@ -139,7 +132,7 @@ public class Server {
 		Message message = null;
 		try(ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(new FileInputStream("files/messages.dat")))) {
 			int n = ois.readInt();
-			for (int i = 0; i < n; i++) {
+			for (int i=0;i<n;i++) {
 				message=(Message) ois.readObject();
 				System.out.println(message.getTimeSent()+": "+message.getText());
 			}
@@ -148,31 +141,37 @@ public class Server {
 		}
 	}
 
+	public void removeAllClients() {
+		for(int i = al.size(); --i >= 0;) {
+			serverUI.removeUsers(al.get(i).user.getUsername());
+			al.removeAll(al);
+		}
+	}
+
 	private class ClientThread extends Thread {
 		Socket socket;
 		ObjectInputStream sInput;
 		ObjectOutputStream sOutput;
-		int id;
-		String username, date;
 		Message message;
 		User user;
 		ClientThread(Socket socket) {
-			id = ++uniqueId;
 			this.socket = socket;
 			try {
-				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
 				user = (User) sInput.readObject();
-				display(user.getUsername() + " just connected.");
-				serverUI.appendUsers(user.getUsername()+"\n");
+				System.out.println(socket.getPort()+" "+user.getUsername());
+				clients.put(user.getUsername(), socket);
+				display(user.getUsername()+" just connected.");
+				writeUserToFile(user,"files/users.dat");
+				serverUI.appendUsers(user.getUsername());
 			}
 			catch (IOException e) {
 				display("Exception creating new Input/output Streams: " + e);
 				return;
 			}
 			catch (ClassNotFoundException e) {
+				e.printStackTrace();
 			}
-			date = new Date().toString() + "\n";
 		}
 		public void run() {
 			boolean running = true;
@@ -183,7 +182,7 @@ public class Server {
 					message.setTimeRecived(time);
 				}
 				catch (IOException e) {
-					display(username + " Exception reading Streams: " + e);
+					display(user.getUsername()+ " Exception reading Streams: " + e);
 					break;				
 				}
 				catch(ClassNotFoundException e2) {
@@ -192,19 +191,15 @@ public class Server {
 				switch(message.getType()) {
 				case Message.MESSAGE:
 					broadcast(message);
-					try {
-						writeToFile(message, "files/messages.dat");
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
 					break;
 				case Message.LOGOUT:
-					display(username + " has disconnected from the server.");
+					display(user.getUsername() + " has disconnected from the server.");
+					serverUI.removeUsers(user.getUsername());
+					user.setStatus(0);
 					running = false;
 					break;
 				}
 			}
-			remove(id);
 			close();
 		}
 		private void close() {
@@ -213,22 +208,27 @@ public class Server {
 				sInput.close();
 				socket.close();
 			}
-			catch(Exception e) {}
+			catch(Exception e) {
+				e.printStackTrace();
+			}
 		}
 
-		/*
-		 * Write a String to the Client output stream
-		 */
-		private boolean writeMsg(String msg) {
-			if(!socket.isConnected()) {
-				close();
-				return false;
-			}
+		private boolean sendMessage(Message message) {
 			try {
-				sOutput.writeObject(msg);
+				for(User user:message.getReciverList()){
+					Socket socket = clients.get(user.getUsername());
+					if(socket.isConnected()) {
+						System.out.println("User is connected");
+						sOutput = new ObjectOutputStream(socket.getOutputStream());
+						sOutput.writeObject(message);
+					}
+					else {
+						System.out.println("User is not connected");
+					}
+				}
 			}
 			catch(IOException e) {
-				display("Error sending message to " + username);
+				display("Error sending message to " + user.getUsername());
 				display(e.toString());
 			}
 			return true;
