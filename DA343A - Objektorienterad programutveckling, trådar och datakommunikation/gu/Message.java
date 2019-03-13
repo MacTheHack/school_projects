@@ -38,6 +38,14 @@ public class Message implements Serializable {
 	public Message(int type) {
 		this.type=type;
 	}
+	public Message(Message msg) {
+		this.text=msg.getText();
+		this.image=msg.getIcon();
+		this.sender=msg.getSender();
+		this.reciverList=msg.getReciverList();
+		this.type=msg.getType();
+		this.timeRecived=msg.getTimeRecived();
+	}
 	public String getText() {
 		return text;
 	}

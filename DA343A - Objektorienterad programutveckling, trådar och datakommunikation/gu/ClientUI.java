@@ -16,7 +16,7 @@ public class ClientUI extends JPanel implements ActionListener{
 	private User user;
 	private ImageIcon profileImage, img;
 	private ArrayList<User> reciverList = new ArrayList<User>();
-	private static Contacts contacts = new Contacts();
+	private static Contacts contacts;
 
 	private JPanel panelNorth = new JPanel();
 	private JPanel panelNorthCenter = new JPanel();
@@ -24,6 +24,8 @@ public class ClientUI extends JPanel implements ActionListener{
 	private JPanel panelCenter = new JPanel();
 	private JPanel panelSouth = new JPanel();
 	private JPanel panelWhole = new JPanel();
+	
+	private JLabel lblTo = new JLabel("Send to:");
 
 	private JButton btnChoose = new JButton("Choose");
 	private JButton btnConnect = new JButton("Connect to server");
@@ -46,6 +48,7 @@ public class ClientUI extends JPanel implements ActionListener{
 	
 
 	public ClientUI() {
+		contacts = new Contacts(this);
 		connected(false);
 		actionListener();
 		setLayout();
@@ -69,7 +72,8 @@ public class ClientUI extends JPanel implements ActionListener{
 		textPaneViewer = new JList<Object>(messageListModel);
 		textPaneViewer.setSelectionModel(new DisabledItemSelectionModel());
 		textPaneViewer.setBackground(new Color(220,220,220));
-		panelCenter.add(new JScrollPane(textPaneViewer));
+		panelCenter.add(new JScrollPane(textPaneViewer),BorderLayout.CENTER);
+		panelCenter.add(lblTo, BorderLayout.SOUTH);
 
 		panelSouth.add(btnSend, BorderLayout.EAST);
 		panelSouth.add(textPaneMessage, BorderLayout.CENTER);
@@ -168,6 +172,14 @@ public class ClientUI extends JPanel implements ActionListener{
 		}
 		return u;
 	}
+	
+	public void setReciverList(ArrayList<User> reciverList) {
+		this.reciverList=reciverList;
+		for(User u:reciverList) {
+			lblTo.setText(lblTo.getText()+u.getUsername()+",");
+		}
+	}
+	
 	public ImageIcon resizeImage(String ImagePath, JTextPane tp){
 		ImageIcon MyImage = new ImageIcon(ImagePath);
 		Image img = MyImage.getImage();
@@ -201,30 +213,35 @@ public class ClientUI extends JPanel implements ActionListener{
 		}
 		if(e.getSource()==btnConnect) {
 			String username = tfUsername.getText().trim();
-			if(!username.isEmpty()&&profileImage!=null) {
-				boolean userExists = false;
-				if(new File("files/users.dat").exists()) {
-					try { 
-						userExists(username);
-						System.out.println("test");
-					} catch (IOException e1) {
-						e1.printStackTrace();
-					}
-				}
-				if(!userExists) {
-					user = new User(username,profileImage);
-				}
-				else {
-					try {
-						user = getUser(username);
-					} catch (IOException e1) {
-						e1.printStackTrace();
-					}
-				}
-				client = new Client(ipAdress, port, user, this);
-				if(!client.start()) return;
-				connected(true);
-			}
+			user = new User(username, profileImage);
+			client = new Client(ipAdress, port, user, this);
+			if(!client.start()) return;
+			connected(true);
+			
+//			if(!username.isEmpty()&&profileImage!=null) {
+//				boolean userExists = false;
+//				if(new File("files/users.dat").exists()) {
+//					try { 
+//						userExists(username);
+//						System.out.println("test");
+//					} catch (IOException e1) {
+//						e1.printStackTrace();
+//					}
+//				}
+//				if(!userExists) {
+//					user = new User(username,profileImage);
+//				}
+//				else {
+//					try {
+//						user = getUser(username);
+//					} catch (IOException e1) {
+//						e1.printStackTrace();
+//					}
+//				}
+//				client = new Client(ipAdress, port, user, this);
+//				if(!client.start()) return;
+//				connected(true);
+//			}
 		}
 		if(e.getSource()==btnSend) {
 			if(!textPaneMessage.getText().isEmpty()) {
@@ -233,6 +250,7 @@ public class ClientUI extends JPanel implements ActionListener{
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
+//				reciverList.add(user);
 				if(imageChoosed) client.sendMessage(new Message(Message.MESSAGE, textPaneMessage.getText(),img,user,reciverList));
 				else client.sendMessage(new Message(Message.MESSAGE, textPaneMessage.getText(),null,user,reciverList));
 				textPaneMessage.setText("");

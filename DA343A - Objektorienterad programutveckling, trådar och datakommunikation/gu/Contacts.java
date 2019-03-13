@@ -3,39 +3,46 @@ import java.net.*;
 import java.io.*;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.util.*;
 
-public class Contacts extends JPanel{
+public class Contacts extends JPanel implements ActionListener{
 	private ObjectOutputStream oos;
 	private ObjectInputStream ois;
 
 	private JPanel panelNorth = new JPanel();
 	private JPanel panelCenter = new JPanel();
 	private JPanel panelSouth = new JPanel();
-	
+
 	private JLabel activeUsers = new JLabel("Active users");
 	private JLabel yourContacts = new JLabel("Your contacts");
-	
+
 	private JButton addContact = new JButton("Add contact");
 	private JButton removeContact = new JButton("Remove Contact");
 	private JButton send = new JButton("Send to selected contacts");
-	
-	private JTextPane contactList = new JTextPane();
-	
 
-//	private Vector<String> list = new Vector<String>();
+	private JTextPane contactList = new JTextPane();
+
+
+	//	private Vector<String> list = new Vector<String>();
 	private DefaultListModel<String> list;
 	private JList userList;
 
+	private ArrayList<User> usersList;
 
-
-	public Contacts() {
+	
+	private ClientUI clientUI;
+	
+	public Contacts(ClientUI clientUI) {
 		list = new DefaultListModel<String>();
 		userList = new JList(list);
 		
+		this.clientUI=clientUI;
+
 		userList.setEnabled(true);
-		userList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-		
+		userList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+
 		setLayout();
 		setComponetSize();
 		add(panelNorth, BorderLayout.NORTH);
@@ -48,8 +55,10 @@ public class Contacts extends JPanel{
 		panelSouth.add(send, BorderLayout.CENTER);
 		panelSouth.add(removeContact, BorderLayout.EAST);	
 		panelNorth.add(userList, BorderLayout.CENTER);
+		
+		send.addActionListener(this);
 	}
-	
+
 	public void createFrame() {
 		JFrame frame = new JFrame("Your contacts");
 		frame.setPreferredSize(new Dimension(500,600));
@@ -65,7 +74,7 @@ public class Contacts extends JPanel{
 		panelNorth.setLayout(new BorderLayout());
 		panelCenter.setLayout(new BorderLayout());
 		panelSouth.setLayout(new BorderLayout());
-		
+
 	}
 
 	private void setComponetSize() {
@@ -75,6 +84,7 @@ public class Contacts extends JPanel{
 		removeContact.setPreferredSize(new Dimension(120,20));
 	}
 	public void displayUsers(ArrayList<User> arrayList) {
+		usersList=arrayList;
 		for(User u: arrayList) {
 			String userName = u.getUsername();
 			list.addElement(userName);
@@ -85,17 +95,35 @@ public class Contacts extends JPanel{
 			list.addElement(u);
 		}
 	}
-	
-	
 
-	public static void main(String[] args) {
-		Contacts contacts = new Contacts();
-		ArrayList<String> list = new ArrayList<String>();
-		list.add("123");
-		list.add("fff");
-		list.add("1524");
-		contacts.test(list);
-		contacts.createFrame();
+	private ArrayList<User> selectedItem() {
+		int[] selectedIx = userList.getSelectedIndices();
+		ArrayList<User> selectedUsers = new ArrayList<>();
+		for (int i = 0; i < selectedIx.length; i++) {
+			Object sel = userList.getModel().getElementAt(selectedIx[i]);
+			for(User u:usersList) {
+				if(sel.equals(u.getUsername()))
+					selectedUsers.add((User) u);
+			}
+		}
+		return selectedUsers;
+	}
+
+//	public static void main(String[] args) {
+//		Contacts contacts = new Contacts();
+//		ArrayList<String> list = new ArrayList<String>();
+//		list.add("123");
+//		list.add("fff");
+//		list.add("1524");
+//		contacts.test(list);
+//		contacts.createFrame();
+//	}
+
+	@Override
+	public void actionPerformed(ActionEvent e) {
+		if(e.getSource()==send) {
+			clientUI.setReciverList(selectedItem());
+		}
 	}
 }
 

@@ -11,12 +11,13 @@ public class Server {
 	private ArrayList<Message> messages;
 	private ArrayList<User> users;
 	private ArrayList<User> userList = new ArrayList<>();
+	private HashMap<Socket,Message> unsentMessages;
 	private ServerUI serverUI;
 	private SimpleDateFormat sdf;
 	private int port;
 	private boolean running;
 	private HashMap<String, Socket> clients;
-	
+
 	public Server(int port) {
 		this(port, null);
 	}
@@ -29,6 +30,7 @@ public class Server {
 		messages = new ArrayList<Message>();
 		users = new ArrayList<User>();
 		clients = new HashMap<>();
+		unsentMessages = new HashMap<>();
 	}
 
 	public void start() {
@@ -92,11 +94,12 @@ public class Server {
 		String time = sdf.format(new Date());
 		message.setTimeSent(time);
 		serverUI.appendRoom(message);  
-		for(int i = al.size(); --i >= 0;) {
-			ClientThread ct = al.get(i);
-			if(!ct.isAlive())
-				System.out.println(ct.user.getUsername());
-			ct.sendMessage(message);
+		for(int i=0;i<al.size();i++) {
+			if(al.get(i).user.getUsername().equals(message.getSender().getUsername())) {
+				ClientThread ct = al.get(i);
+				if(!ct.isAlive()) System.out.println(ct.user.getUsername());
+				ct.sendMessage(message);
+			}
 		}
 
 	}
@@ -115,7 +118,7 @@ public class Server {
 			}
 		}
 	}
-	
+
 	private void writeUserToFile(User user, String filename) throws IOException {
 		users.add(user);
 		try(ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(filename)))) {
@@ -159,19 +162,13 @@ public class Server {
 			this.socket = socket;
 			try {
 				sInput  = new ObjectInputStream(socket.getInputStream());
-				
 				user = (User) sInput.readObject();
-				
 				System.out.println(socket.getPort()+" "+user.getUsername());
-				
 				userList.add(user);
-				
+				//				sendUserList();
 				clients.put(user.getUsername(), socket);
-				
 				display(user.getUsername()+" just connected.");
-				
 				writeUserToFile(user,"files/users.dat");
-				
 				serverUI.appendUsers(user.getUsername());
 			}
 			catch (IOException e) {
@@ -187,8 +184,11 @@ public class Server {
 			while(running) {
 				try {
 					String time = sdf.format(new Date());
-					message = (Message) sInput.readObject();
-					message.setTimeRecived(time);
+					Object obj = sInput.readObject();
+					if(obj instanceof Message) {
+						message = (Message) obj;
+						message.setTimeRecived(time);
+					}
 				}
 				catch (IOException e) {
 					display(user.getUsername()+ " Exception reading Streams: " + e);
@@ -197,23 +197,24 @@ public class Server {
 				catch(ClassNotFoundException e2) {
 					break;
 				}
-				switch(message.getType()) {
-				case Message.MESSAGE:
-					broadcast(message);
-					break;
-				case Message.LOGOUT:
-					display(user.getUsername() + " has disconnected from the server.");
-					serverUI.removeUsers(user.getUsername());
-					user.setStatus(0);
-					running = false;
-					break;
+				if(message!=null) {
+					switch(message.getType()) {
+					case Message.MESSAGE:
+						broadcast(message);
+						break;
+					case Message.LOGOUT:
+						display(user.getUsername() + " has disconnected from the server.");
+						serverUI.removeUsers(user.getUsername());
+						user.setStatus(0);
+						running = false;
+						break;
+					}
 				}
 			}
 			close();
 		}
 		private void close() {
 			try {
-				sOutput.close();
 				sInput.close();
 				socket.close();
 			}
@@ -222,24 +223,29 @@ public class Server {
 			}
 		}
 
+		private void sendUserList() throws IOException {
+			sOutput = new ObjectOutputStream(socket.getOutputStream());
+			sOutput.writeObject(userList);
+		}
+
 		private boolean sendMessage(Message message) {
 			try {
 				for(User user:message.getReciverList()){
 					Socket socket = clients.get(user.getUsername());
-					if(socket.isConnected()) {
+					if(!socket.isClosed()) {
 						System.out.println("User is connected");
 						sOutput = new ObjectOutputStream(socket.getOutputStream());
-						sOutput.writeObject(userList);
-//						sOutput.writeObject(message);
+											sOutput.writeObject(userList);
+						sOutput.writeObject(message);
 					}
 					else {
+						unsentMessages.put(socket, message);
 						System.out.println("User is not connected");
 					}
 				}
 			}
 			catch(IOException e) {
-				display("Error sending message to " + user.getUsername());
-				display(e.toString());
+				display("Error sending message to " + user.getUsername()+"\n"+e.toString());
 			}
 			return true;
 		}
